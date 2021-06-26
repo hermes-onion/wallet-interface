@@ -1,0 +1,19 @@
+{
+  "name": "wallet-interface",
+  "version": "0.0.1",
+  "description": "Hermes wallet interface.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node src/tests/tests.js"
+  },
+  "author": "tgbv",
+  "license": "BSD-3-Clause",
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "monero-javascript": "^0.5.3",
+    "node-graceful-shutdown": "^1.1.0",
+    "otplib": "^12.0.1",
+    "socket.io": "^4.1.2",
+    "socket.io-client": "^4.1.2"
+  }
+}

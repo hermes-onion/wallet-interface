@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.2/socket.io.js" integrity="sha512-iZIBSs+gDyTH0ZhUem9eQ1t4DcEn2B9lHxfRMeGQhyNdSUz+rb+5A3ummX6DQTOIs1XK0gOteOg/LPtSo9VJ+w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<script>
+    const Conn = io('http://127.0.0.1:81', {
+        extraHeaders: {
+            authorization: 'Bearer 0000000000000000000000000000000000000000000000000000001824374495',
+        }
+    })
+
+    Conn.on('meme', data=>console.log(data))
+    Conn.on('make-account-res', json=> console.log(json) )
+    Conn.on('tx-confirmed', json=>console.log(json))
+    Conn.on('get-address-of-account-res', json=>console.log(json))
+
+</script>
+</body>
+</html>
