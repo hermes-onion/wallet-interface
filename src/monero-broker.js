@@ -34,7 +34,9 @@ module.exports = class {
             await LibraryUtils.setLogLevel(10)
 
         let daemon = await connectToWalletRpc(
-            process.env.RPC_SCHEME, 
+            process.env.ENV === 'dev' ? 
+                process.env.RPC_SCHEME_TESTNET : 
+                process.env.RPC_SCHEME_MAINNET, 
             process.env.RPC_USR, 
             process.env.RPC_PSS
         );
