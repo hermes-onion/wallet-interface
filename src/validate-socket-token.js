@@ -1,10 +1,3 @@
-const {totp} = require('otplib')
-
-totp.options = {
-    digits: parseInt(process.env.TOTP_DIGITS),
-    step: parseInt(process.env.TOTP_PERIOD),
-}
-
 /**
  * Checks the authorization bearer sent by the client
  */
@@ -18,17 +11,21 @@ module.exports = (socket, next)=>{
             if(process.env.ENV === 'dev') {
                 console.log('checking IN|VALID tokens:', 
                     bearer[1], 
-                    totp.generate(require('./get-totp-secret')())
+                    process.env.WINTER_SECRET
                 )
             }
 
-            if(totp.check( bearer[1], require('./get-totp-secret')() )) next()
-            else next(new Error("bad digits"))
+            if(bearer[1] === process.env.WINTER_SECRET) next()
+            else throw "bad token"
         } catch(e) {
             console.log(e)
-            next(new Error("forbidden"))
+            next(new Error(e))
+            socket.disconnect()
         }
     } 
-    else next(new Error("bad request"))
+    else {
+        next(new Error("bad request"))
+        socket.disconnect()
+    }
     
 }
