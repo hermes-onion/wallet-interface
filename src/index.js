@@ -26,6 +26,7 @@ const clients = require('./socket-clients');
             process.env.RPC_SCHEME_TESTNET : 
             process.env.RPC_SCHEME_MAINNET
     })
+    await Broker.openWallet(process.env.ENV === "dev" ? "testnet" : "mainnet")
 
     /**
      * ...then SocketIO
