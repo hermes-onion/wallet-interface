@@ -1,47 +1,30 @@
 require('dotenv').config({
     'path': `${__dirname}/../../.env`
-})
+});
 
-const {totp} = require('otplib');
-totp.options = {    
-    digits: parseInt(process.env.TOTP_DIGITS),
-    period: parseInt(process.env.TOTP_PERIOD),
-}
+(async ()=>{
+    try {
 
-let token = totp.generate(require('../get-totp-secret')())
-
-/**
- * make sure server is started first
- */
-setTimeout(()=>{
-
-
-const Conn = require("socket.io-client")
-    (`http://${process.env.HTTP_HOST}:${process.env.HTTP_PORT}`, {
-        extraHeaders: {
-            authorization: `Bearer ${token}`
-        }
+    const MoneroBroker = require('../monero-broker')
+    const broker = new MoneroBroker({
+        url: 'http://127.0.0.1:8885',
+        username: 'admin',
+        password: 'admin',
     })
 
-Conn.on('connect', ()=>{
-    setTimeout(()=>{
-        Conn.emit('make-account', 'some acc label')
+    console.log( await broker.openWallet('testnet', require('../get-wallet-password')()) )
 
-    }, 1000)
-})
+    //console.log( await broker.createAccount() )
+    //const acc = await broker.createAccount()
 
-Conn.on('$error', data=>console.log(data))
-Conn.on('make-account-res', json=> {
-    console.log(json)
+    //console.log( await broker.createAddress(2))
 
-    Conn.emit('get-address-of-account', json.index)
-} )
-Conn.on('tx-confirmed', json=>console.log(json))
-Conn.on('get-address-of-account-res', json=>console.log(json))    
-
-
-
-},1000);
-
-
+    //console.log( await broker.getAccounts())
+    //console.log( await broker.getAddress(acc.account_index, []))
+    //console.log( await broker.getAddressBook([0, 1]))
+    console.log( await broker.getTransferByTxid('bc35902057c5dc0ecbc3bc9afaeaa48d8fa6eb4259685cfacccb30b9ef1a8380'))
+    } catch(e) {
+        console.log(e)
+    }
+})();
 

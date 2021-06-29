@@ -18,10 +18,14 @@ const clients = require('./socket-clients');
     */
 
     /**
-     * First set up broker!
+     * First set up Broker!
      */
-    const broker = await require('./monero-broker').init()
-    await broker.startListener()
+    const MoneroBroker = require('./monero-broker')
+    const Broker = new MoneroBroker({
+        url: 'http://127.0.0.1:8885',
+        username: 'admin',
+        password: 'admin',
+    })
 
     /**
      * ...then SocketIO
@@ -32,32 +36,35 @@ const clients = require('./socket-clients');
 
         /**
          * creates a new account
+         * 
+         * json: { label, rid (request ID) }
          */
-        Socket.on('make-account', async (label = new Date)=>{
+        Socket.on('make-account', async (json)=>{
             try {
-                Socket.emit('make-account-res', {
-                    index: await broker.createAccount(label),
+                Socket.emit(`make-account-res-${json.rid}`, {
+                    account: await Broker.createAccount(json.label),
                     success: true,
                 })
             } catch(e) {
-                Socket.emit('make-account-res', {
+                Socket.emit(`make-account-res-${json.rid}`, {
                     success: false,
                 })
             }
         })
 
         /**
-         * get address of account
+         * retrieves the address of an account
+         * 
+         * json: { label, rid (request ID) }
          */
-        Socket.on('get-address-of-account', async account_index=>{
+        Socket.on('get-account-address', async json=>{
             try {
-                Socket.emit('get-address-of-account-res', {
+                Socket.emit(`get-account-address-res-${json.rid}`, {
+                    address: (await Broker.getAddress(json.account_index, [0])).address,
                     success: true,
-                    address: await broker.getAccountLastSubAddress(account_index)
                 })
-            }catch(e){
-                console.log(e)
-                Socket.emit('get-address-of-account-res', {
+            } catch(e) {
+                Socket.emit(`get-account-address-res-${json.rid}`, {
                     success: false,
                 })
             }
@@ -71,12 +78,15 @@ const clients = require('./socket-clients');
                 }
             })
         })
-    })
+    });
+
+    // tx notify receiver
+    require('./tx-notify-responder')(Broker);
 
     // ws server must listen only if no exception has been thrown
     httpServer.listen(process.env.HTTP_PORT, process.env.HTTP_HOST, ()=>{
         console.log(`started listening.. ${process.env.HTTP_HOST}:${process.env.HTTP_PORT}`)
-    })
+    });
 
 })();
 

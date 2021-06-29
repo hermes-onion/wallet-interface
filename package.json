@@ -9,10 +9,11 @@
   "author": "tgbv",
   "license": "BSD-3-Clause",
   "dependencies": {
+    "axios": "^0.21.1",
     "dotenv": "^10.0.0",
-    "monero-javascript": "^0.5.3",
     "node-graceful-shutdown": "^1.1.0",
     "socket.io": "^4.1.2",
-    "socket.io-client": "^4.1.2"
+    "socket.io-client": "^4.1.2",
+    "zeromq": "^6.0.0-beta.6"
   }
 }

@@ -1,0 +1,1 @@
+monero-wallet-rpc --daemon-host testnet.community.xmr.to --disable-rpc-login --testnet --trusted-daemon --rpc-bind-port 8885 --wallet-dir "/home/u/monero" --tx-notify "/media/u/data/john/hermes-onion/tx-notify-request/main.bin -tx-hash=%s"

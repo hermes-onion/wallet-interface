@@ -1,161 +1,157 @@
-const {connectToWalletRpc, LibraryUtils, MoneroWallet, MoneroWalletListener, createWalletFull} = require('monero-javascript');
-const MoneroDaemonRpc = require('monero-javascript/src/main/js/daemon/MoneroDaemonRpc');
-const {homedir} = require('os')
-const { onShutdown } = require( "node-graceful-shutdown" )
+const Axios = require('axios')
 
 /**
- * Creates a wallet based on application env.
- * 'mainnet' for production, 'testnet' for development.
- * 
- * Should be used if there is no wallet
+ * Interacts with wallet-rpc
  */
-const createWallet = async ()=>{
-    await createWalletFull({
-        path: `${homedir()}/monero/${process.env.ENV === 'prod' ? 'mainnet' : 'testnet'}`,
-        password: require('./get-wallet-password')(),
-        networkType: process.env.ENV === 'prod' ? 'mainnet' : 'testnet',
-    });
-}
-
-
-/**
- * Broker between monero-cli and app runtime
- */
-module.exports = class {
+class MoneroBroker {
     /**
-     * Factory.
-     * Exceptions MUST crash the runtime
-     * 
-     * @returns {self} instance
+     * @param {object} config
      */
-    static async init(){
-        // configures log level
-        if(process.env.ENV !== 'prod')
-            await LibraryUtils.setLogLevel(10)
+    constructor(config){
+        this._config = config
+    }
 
-        let daemon = await connectToWalletRpc(
-            process.env.ENV === 'dev' ? 
-                process.env.RPC_SCHEME_TESTNET : 
-                process.env.RPC_SCHEME_MAINNET, 
-            process.env.RPC_USR, 
-            process.env.RPC_PSS
-        );
-        
-        await daemon.openWallet(
-            process.env.ENV === 'prod' ? 'mainnet' : 'testnet', 
-            require('./get-wallet-password')()
-        );
+    /**
+     * Send commands to wallet rpc process
+     * 
+     * @param {string} method 
+     * @param {object} params 
+     * @returns {Promise} Promise
+     */
+    send(method, params){
 
-        console.log('wallet opened with success! sync in progress..')
-
-        await daemon.sync(parseInt(process.env.WALLET_START_SYNC))
-
-        console.log('sync done.')
-
-        // safely close wallet
-        onShutdown('monero-wallet', async ()=>{
-            console.log('closing wallet...')
-            await daemon.closeWallet()
+        return new Promise((accept, reject)=>{
+            Axios.post(
+                `${this._config.url}/json_rpc`, 
+                {
+                    id: "0",
+                    jsonrpc: "2.0",
+                    method,
+                    params,
+                }
+            ).then(response=>{
+                if(response.data.error) reject(response.data.error)
+                else accept(response.data.result)
+            }).catch(error=> reject(error))
         })
-
-        return new this(daemon)
     }
 
     /**
-     * Starts wallet related events.
-     * Amid exception it must crash the runtime.
+     * Opens a wallet
      * 
-     * @returns {void}
+     * @param {string} filename
+     * @param {string} password
      */
-    async startListener(){
-        let broker = this
-
-        await this._daemon.addListener(new class extends MoneroWalletListener {
-          async onOutputReceived(Out) {
-              
-            let TX = Out.getTx()
-
-            if(process.env.DEV === 'dev') console.log('output received: ', Out)
-
-            // if tx is confirmed broadcast this info to socket clients
-            if(TX.isConfirmed() && TX.isLocked()) {
-
-                if(process.env.DEV === 'dev') 
-                    console.log('output TX is confirmed and locked (ready to broadcast): ', TX.getHash())
-
-                let accIndex = Out.getAccountIndex()
-
-                await broker._daemon.createSubaddress(accIndex)
-
-                require('./socket-clients').forEach(Client=>{
-                    Client.emit('tx-confirmed', {
-                        'account-index': accIndex,
-                        balance: Out.getAmount(),
-                        txId: TX.getHash(),
-                    })
-                })     
-            }
-          }
-        });
+    openWallet(filename, password){
+        return new Promise((accept, reject)=>{
+            this.send("open_wallet", {filename, password})
+            .then(res=>accept(res))
+            .catch(err=>reject(err))
+        })
     }
 
     /**
-     * Takes daemon as parameter
+     * Create a new account
      * 
-     * @param {MoneroDaemonRpc} daemon instance
+     * @param {string} label 
+     * @returns {Promise}
      */
-    constructor(daemon){
-        this._daemon = daemon
+    createAccount(label = undefined){
+        return new Promise((accept, reject)=>{
+            this.send("create_account", {label})
+            .then(res=>accept(res))
+            .catch(err=>reject(err))
+        })
     }
 
     /**
-     * Creates a new account and returns its index
-     * 
-     * @param {string} label defaults to current Date
-     * @returns {int} account index 
-     */
-    async createAccount(label = new Date){
-        let acc = await this._daemon.createAccount(label)
-
-        return acc.getIndex()
-    }
-
-    /**
-     * Retrieves account's primary address
+     * Creates a new address for an account located by its index
      * 
      * @param {int} account_index 
-     * @returns {string}
+     * @param {string} label 
+     * @returns {Promise}
      */
-    async getAccountAddress(account_index){
-        const accounts = await this._daemon.getAccounts()
-
-        for(const Acc of accounts){
-            if(Acc.getIndex() === account_index)
-                return await Acc.getPrimaryAddress()            
-        }
-
-
-        throw new Error('account does not exist')
+    createAddress(account_index, label = undefined) {
+        return new Promise((accept, reject)=>{
+            this.send("create_address", {account_index, label})
+            .then(res=>accept(res))
+            .catch(err=>reject(err))
+        })
     }
 
     /**
-     * Retrieves account's last sub-address
+     * Returns all accounts and filters them based on tags
      * 
-     * @param {int} account_index 
-     * @returns {string}
+     * @param {string} tag 
+     * @returns {Promise}
      */
-    async getAccountLastSubAddress(account_index){
-        const accounts = await this._daemon.getAccounts(true)
+     getAccounts(tag = undefined){
+        return new Promise((accept, reject)=>{
+            this.send("get_accounts", {tag})
+            .then(res=>accept(res))
+            .catch(err=>reject(err))
+        })
+    }
 
-        for(const Acc of accounts){
-            if(Acc.getIndex() === account_index){
-                let addresses = Acc.getSubaddresses()
-                
-                return addresses[addresses.length-1].getAddress()
-            }
-                
+    /**
+     * Retrieves transfer information by its ID
+     * 
+     * @param {string} txid 
+     * @param {int} account_index
+     * @returns {Promise}
+     */
+    async getTransferByTxid(txid, account_index = undefined){
+        if(account_index) {
+            return await this.send("get_transfer_by_txid", { txid, account_index })
         }
 
-        throw new Error('account does not exist')
+        const accounts = await this.getAccounts()
+
+        // iterate accounts
+        for (const acc of accounts.subaddress_accounts) {
+            try {
+                return await this.send("get_transfer_by_txid", {
+                    txid, 
+                    account_index: acc.account_index,
+                })
+            } catch(e) {
+                if(e.code === -8) continue
+            }
+        }
+
+        // should not be reached
+        throw {code: -8, message: 'tx not found'}
+    }
+
+    /**
+     * Return the wallet's addresses for an account. Optionally filter for specific set of subaddresses.
+     * 
+     * @param {int} account_index 
+     * @param {int[]} address_index 
+     * @returns {Promise}
+     */
+    getAddress(account_index, address_index = [])
+    {
+        return new Promise((accept, reject)=>{
+            this.send("get_address", {account_index, address_index})
+            .then(res=>accept(res))
+            .catch(err=>reject(err))
+        })
+    }
+
+    /**
+     * Retrieves entries from the address book
+     * 
+     * @param {array} entries 
+     * @returns {Promise}
+     */
+    getAddressBook(entries){
+        return new Promise((accept, reject)=>{
+            this.send("get_address_book", {entries})
+            .then(res=>accept(res))
+            .catch(err=>reject(err))
+        })
     }
 }
+
+module.exports = MoneroBroker
