@@ -22,9 +22,9 @@ const clients = require('./socket-clients');
      */
     const MoneroBroker = require('./monero-broker')
     const Broker = new MoneroBroker({
-        url: 'http://127.0.0.1:8885',
-        username: 'admin',
-        password: 'admin',
+        url: process.env.ENV === "dev" ? 
+            process.env.RPC_SCHEME_TESTNET : 
+            process.env.RPC_SCHEME_MAINNET
     })
 
     /**
